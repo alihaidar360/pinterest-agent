@@ -1,18 +1,26 @@
 """
 Etsy Open API v3 se products search karne ke liye.
+NOTE: Etsy ko x-api-key header mein "keystring:shared_secret" dono chahiye,
+sirf keystring nahi - warna 403 Forbidden aata hai.
 """
 
 import os
 import requests
 
 ETSY_API_KEY = os.environ.get("ETSY_API_KEY")
+ETSY_SHARED_SECRET = os.environ.get("ETSY_SHARED_SECRET")
 BASE_URL = "https://openapi.etsy.com/v3/application"
+
+
+def _auth_header():
+    """x-api-key header banata hai - keystring:shared_secret format mein."""
+    return {"x-api-key": f"{ETSY_API_KEY}:{ETSY_SHARED_SECRET}"}
 
 
 def search_products(keyword, limit=8):
     """Etsy pe keyword se active listings search karta hai."""
     url = f"{BASE_URL}/listings/active"
-    headers = {"x-api-key": ETSY_API_KEY}
+    headers = _auth_header()
     params = {
         "keywords": keyword,
         "limit": limit,
@@ -43,7 +51,7 @@ def search_products(keyword, limit=8):
 
 def get_listing_image(listing_id):
     url = f"{BASE_URL}/listings/{listing_id}/images"
-    headers = {"x-api-key": ETSY_API_KEY}
+    headers = _auth_header()
     try:
         response = requests.get(url, headers=headers, timeout=15)
         response.raise_for_status()
