@@ -1,0 +1,41 @@
+name: 15-Day Self Optimizer
+
+on:
+  schedule:
+    # Har 15 din pe chalega (GitHub cron exact "every 15 days" support nahi karta,
+    # isliye roz check karta hai aur script khud decide karti hai ki chalna hai ya nahi
+    # - simplest version: har mahine ki 1st aur 16th tareekh ko chalao)
+    - cron: '0 3 1,16 * *'
+  workflow_dispatch: {}
+
+jobs:
+  optimize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run 15-day optimizer
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+          PINTEREST_ACCESS_TOKEN: ${{ secrets.PINTEREST_ACCESS_TOKEN }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+        run: python main_optimizer.py
+
+      - name: Commit updated prompts back to repo
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
+          git add config/prompts.json
+          git commit -m "Agent 6: auto-updated prompts based on 15-day performance" || echo "No changes to commit"
+          git push
