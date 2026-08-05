@@ -11,4 +11,4 @@ metrics (impressions, clicks, saves). This data is used only to improve
 our own content strategy and is not sold, shared, or used for any
 purpose beyond internal business analytics.
 
-For questions, contact: [your email here]
+For questions, contact: lumiereluxestudio@gmail.com
