@@ -14,7 +14,7 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 CLAUDE_API_KEY = os.environ.get("CLAUDE_API_KEY")
 
 genai.configure(api_key=GEMINI_API_KEY)
-gemini_model = genai.GenerativeModel("gemini-2.5-flash")
+gemini_model = genai.GenerativeModel("gemini-1.5-flash")
 
 claude_client = Anthropic(api_key=CLAUDE_API_KEY)
 
