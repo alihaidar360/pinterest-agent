@@ -1,22 +1,26 @@
 """
-AI client wrappers - Gemini aur Claude dono ke liye.
-Ye file API keys ko environment variables (GitHub Secrets) se uthati hai.
+AI client wrappers - Gemini (trends) aur Groq (judging/content/optimizer) dono ke liye.
+Claude hata diya gaya hai - poora system ab 100% free hai.
 """
 
 import os
 import json
 import re
+import base64
 import google.generativeai as genai
-from anthropic import Anthropic
+from groq import Groq
 
 # --- Setup clients using environment variables (GitHub Secrets se aate hain) ---
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-CLAUDE_API_KEY = os.environ.get("CLAUDE_API_KEY")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
 genai.configure(api_key=GEMINI_API_KEY)
 gemini_model = genai.GenerativeModel("gemini-flash-latest")
 
-claude_client = Anthropic(api_key=CLAUDE_API_KEY)
+groq_client = Groq(api_key=GROQ_API_KEY)
+
+GROQ_TEXT_MODEL = "openai/gpt-oss-120b"
+GROQ_VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 
 def _extract_json(text):
@@ -27,15 +31,15 @@ def _extract_json(text):
     try:
         return json.loads(text)
     except json.JSONDecodeError:
-        # Try to find JSON object/array inside the text
         match = re.search(r"(\{.*\}|\[.*\])", text, re.DOTALL)
         if match:
             return json.loads(match.group(1))
         raise
 
 
+# ---------------- GEMINI (sirf Agent 1 - Trend Scanner ke liye) ----------------
+
 def gemini_text(prompt):
-    """Gemini se simple text/JSON response lena (no image)."""
     response = gemini_model.generate_content(prompt)
     return response.text
 
@@ -44,54 +48,37 @@ def gemini_text_json(prompt):
     return _extract_json(gemini_text(prompt))
 
 
-def gemini_vision_json(prompt, image_bytes_list):
-    """
-    Gemini ko images + prompt bhejna, JSON response lena.
-    image_bytes_list: list of (mime_type, bytes) tuples
-    """
-    parts = [prompt]
-    for mime_type, img_bytes in image_bytes_list:
-        parts.append({"mime_type": mime_type, "data": img_bytes})
-    response = gemini_model.generate_content(parts)
-    return _extract_json(response.text)
+# ---------------- GROQ (Agent 3+4+5 evaluator, Agent 6 optimizer) ----------------
 
-
-def claude_text(prompt, max_tokens=1500):
-    """Claude se simple text response lena."""
-    message = claude_client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=max_tokens,
+def groq_text(prompt, max_tokens=1500):
+    completion = groq_client.chat.completions.create(
+        model=GROQ_TEXT_MODEL,
         messages=[{"role": "user", "content": prompt}],
+        max_completion_tokens=max_tokens,
     )
-    return message.content[0].text
+    return completion.choices[0].message.content
 
 
-def claude_text_json(prompt, max_tokens=1500):
-    return _extract_json(claude_text(prompt, max_tokens=max_tokens))
+def groq_text_json(prompt, max_tokens=1500):
+    return _extract_json(groq_text(prompt, max_tokens=max_tokens))
 
 
-def claude_vision_json(prompt, image_bytes, mime_type="image/jpeg", max_tokens=1500):
-    """Claude ko ek image + prompt bhejna, JSON response lena."""
-    import base64
+def groq_vision_json(prompt, image_bytes, mime_type="image/jpeg", max_tokens=1500):
+    """Groq ko ek image + prompt bhejna, JSON response lena."""
     b64_image = base64.b64encode(image_bytes).decode("utf-8")
-    message = claude_client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=max_tokens,
+    data_url = f"data:{mime_type};base64,{b64_image}"
+
+    completion = groq_client.chat.completions.create(
+        model=GROQ_VISION_MODEL,
         messages=[
             {
                 "role": "user",
                 "content": [
-                    {
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": mime_type,
-                            "data": b64_image,
-                        },
-                    },
                     {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": data_url}},
                 ],
             }
         ],
+        max_completion_tokens=max_tokens,
     )
-    return _extract_json(message.content[0].text)
+    return _extract_json(completion.choices[0].message.content)
