@@ -1,32 +1,29 @@
 """
 MAIN DAILY ORCHESTRATOR
-Roz chalta hai (GitHub Actions se scheduled) - Agents 1 se 5 tak
-sequence mein chalata hai, aur final ready pins ko Google Sheet mein daal deta hai.
+Roz chalta hai (GitHub Actions se scheduled).
+Flow: Trend Scan (Gemini) -> Product Source (Etsy) -> Evaluate+Content (Groq) -> Design -> Sheet
 """
 
-from agents import trend_scanner, product_sourcer, visual_judge, cross_checker, content_writer
+from agents import trend_scanner, product_sourcer, product_evaluator, content_writer
 from utils.sheets import append_pin_row
 
-TARGET_PIN_COUNT = 8  # 6-10 ke beech, adjust kar sakte hain
+TARGET_PIN_COUNT = 8  # 6-10 ke beech
 
 
 def main():
     print("=== DAILY PIN GENERATION PIPELINE START ===")
 
-    # Agent 1: Trend Scanner
+    # Agent 1: Trend Scanner (Gemini)
     keywords = trend_scanner.run()
 
-    # Agent 2: Product Sourcer
-    candidates = product_sourcer.run(keywords, per_keyword=3, max_total=25)
+    # Agent 2: Product Sourcer (Etsy)
+    candidates = product_sourcer.run(keywords, per_keyword=2, max_total=20)
 
-    # Agent 3: Visual Judge (self-check included)
-    visually_approved = visual_judge.run(candidates)
+    # Agent 3+4+5 combined: Evaluate + Judge + Write Content (Groq, one call per product)
+    approved = product_evaluator.run(candidates, target_count=TARGET_PIN_COUNT)
 
-    # Agent 4: Cross Checker (independent Claude verification)
-    confirmed = cross_checker.run(visually_approved, target_count=TARGET_PIN_COUNT)
-
-    # Agent 5: Content Writer + Designer (self-check included)
-    final_pins = content_writer.run(confirmed)
+    # Agent 5: Portrait image design
+    final_pins = content_writer.run(approved)
 
     # Write everything to Google Sheet for human review
     for pin in final_pins:
