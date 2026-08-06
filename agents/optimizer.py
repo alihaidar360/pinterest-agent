@@ -8,7 +8,7 @@ Ye looping self-improvement system hai.
 
 import json
 from datetime import datetime
-from utils.ai_clients import claude_text_json
+from utils.ai_clients import groq_text_json
 from utils.pinterest_analytics import get_account_analytics, get_top_pins
 from utils.sheets import get_recent_rows
 
@@ -55,7 +55,7 @@ def run():
         f"content_writer_prompt: {prompts['content_writer_prompt']}\n"
     )
 
-    updated = claude_text_json(full_prompt, max_tokens=3000)
+    updated = groq_text_json(full_prompt, max_tokens=3000)
 
     prompts["trend_scanner_prompt"] = updated.get("trend_scanner_prompt", prompts["trend_scanner_prompt"])
     prompts["visual_judge_prompt"] = updated.get("visual_judge_prompt", prompts["visual_judge_prompt"])
