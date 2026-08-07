@@ -54,7 +54,7 @@ def groq_text(prompt, max_tokens=1500):
     completion = groq_client.chat.completions.create(
         model=GROQ_TEXT_MODEL,
         messages=[{"role": "user", "content": prompt}],
-        max_completion_tokens=max_tokens,
+        max_tokens=max_tokens,
     )
     return completion.choices[0].message.content
 
@@ -79,6 +79,6 @@ def groq_vision_json(prompt, image_bytes, mime_type="image/jpeg", max_tokens=150
                 ],
             }
         ],
-        max_completion_tokens=max_tokens,
+        max_tokens=max_tokens,
     )
     return _extract_json(completion.choices[0].message.content)
