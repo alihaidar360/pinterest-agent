@@ -24,17 +24,43 @@ GROQ_VISION_MODEL = "qwen/qwen3.6-27b"
 
 
 def _extract_json(text):
-    """AI responses kabhi kabhi markdown ```json fences ke sath aate hain - clean karta hai."""
+    """
+    AI responses kabhi kabhi markdown ```json fences, <think>...</think> reasoning
+    blocks, ya extra text ke sath aate hain - sab clean karta hai.
+    """
+    if not isinstance(text, str):
+        # Kabhi content list of blocks ke roop mein aata hai - text nikaal lo
+        if isinstance(text, list):
+            text = " ".join(
+                block.get("text", "") if isinstance(block, dict) else str(block)
+                for block in text
+            )
+        else:
+            text = str(text)
+
+    # <think>...</think> ya similar reasoning tags hata do
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+    text = re.sub(r"^```json\s*|\s*```$", "", text.strip(), flags=re.MULTILINE)
     text = text.strip()
-    text = re.sub(r"^```json\s*|\s*```$", "", text, flags=re.MULTILINE)
-    text = text.strip()
+
     try:
         return json.loads(text)
     except json.JSONDecodeError:
-        match = re.search(r"(\{.*\}|\[.*\])", text, re.DOTALL)
-        if match:
-            return json.loads(match.group(1))
-        raise
+        pass
+
+    # Fallback: sabse bada { } ya [ ] block dhoondo text mein
+    obj_match = re.search(r"\{.*\}", text, re.DOTALL)
+    if obj_match:
+        try:
+            return json.loads(obj_match.group(0))
+        except json.JSONDecodeError:
+            pass
+
+    arr_match = re.search(r"\[.*\]", text, re.DOTALL)
+    if arr_match:
+        return json.loads(arr_match.group(0))
+
+    raise ValueError(f"Could not extract JSON from response: {text[:200]}")
 
 
 # ---------------- GEMINI (sirf Agent 1 - Trend Scanner ke liye) ----------------
@@ -50,21 +76,24 @@ def gemini_text_json(prompt):
 
 # ---------------- GROQ (Agent 3+4+5 evaluator, Agent 6 optimizer) ----------------
 
-def groq_text(prompt, max_tokens=1500):
+def groq_text(prompt, max_tokens=2500):
     completion = groq_client.chat.completions.create(
         model=GROQ_TEXT_MODEL,
         messages=[{"role": "user", "content": prompt}],
         max_tokens=max_tokens,
+        response_format={"type": "json_object"},
     )
     return completion.choices[0].message.content
 
 
-def groq_text_json(prompt, max_tokens=1500):
+def groq_text_json(prompt, max_tokens=2500):
     return _extract_json(groq_text(prompt, max_tokens=max_tokens))
 
 
-def groq_vision_json(prompt, image_bytes, mime_type="image/jpeg", max_tokens=1500):
-    """Groq ko ek image + prompt bhejna, JSON response lena."""
+def groq_vision_json(prompt, image_bytes, mime_type="image/jpeg", max_tokens=1200):
+    """Groq ko ek image + prompt bhejna, JSON response lena.
+    NOTE: response_format json_object images ke saath reliably kaam nahi karta,
+    isliye sirf prompt-instruction + robust parsing pe depend karte hain."""
     b64_image = base64.b64encode(image_bytes).decode("utf-8")
     data_url = f"data:{mime_type};base64,{b64_image}"
 
@@ -74,11 +103,15 @@ def groq_vision_json(prompt, image_bytes, mime_type="image/jpeg", max_tokens=150
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": prompt},
+                    {"type": "text", "text": prompt + "\n\nRespond with ONLY valid JSON, no other text, no markdown, no explanation."},
                     {"type": "image_url", "image_url": {"url": data_url}},
                 ],
             }
         ],
         max_tokens=max_tokens,
     )
-    return _extract_json(completion.choices[0].message.content)
+    result = _extract_json(completion.choices[0].message.content)
+    # Kabhi model JSON ko ek list ke andar wrap kar deta hai - unwrap kar lo
+    if isinstance(result, list) and len(result) > 0:
+        result = result[0]
+    return result
