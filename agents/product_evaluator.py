@@ -2,8 +2,11 @@
 AGENT: Product Evaluator (Visual Judge + Cross-Check + Content Writer combined)
 Groq vision model se ek hi call mein: product ko judge karta hai, approve/reject
 karta hai, aur agar approve ho to SEO title/description/alt-text/hashtags bhi
-usi call mein bana deta hai. Ye Claude wale purane 3-agent design ka
-Groq-friendly, kam-calls-wala version hai.
+usi call mein bana deta hai.
+
+NOTE: Groq free tier ka daily token budget (TPD) limited hai (images bohot tokens
+khaate hain), isliye products ki count control mein rakhi gayi hai taaki roz ka
+quota na phate.
 """
 
 import json
@@ -11,6 +14,7 @@ import requests
 from utils.ai_clients import groq_vision_json
 
 MIN_SCORE = 7
+MAX_PRODUCTS_TO_TRY = 10  # roz sirf itne products try karo taaki TPD limit na phate
 
 
 def load_prompt():
@@ -25,11 +29,11 @@ def _fetch_image_bytes(url):
     return resp.content
 
 
-def run(products, target_count=10):
+def run(products, target_count=8):
     base_prompt = load_prompt()
     approved_pins = []
 
-    for product in products:
+    for product in products[:MAX_PRODUCTS_TO_TRY]:
         if len(approved_pins) >= target_count:
             break
         if not product.get("image_url"):
@@ -42,6 +46,10 @@ def run(products, target_count=10):
                 f"Source keyword: {product.get('source_keyword')}\n"
             )
             result = groq_vision_json(full_prompt, image_bytes, mime_type="image/jpeg")
+
+            if not isinstance(result, dict):
+                print(f"[Evaluator] Unexpected response shape for {product.get('title')}, skipping")
+                continue
 
             score = result.get("score", 0)
             approved = result.get("approved", False)
@@ -57,5 +65,5 @@ def run(products, target_count=10):
         except Exception as e:
             print(f"[Evaluator] Failed for {product.get('title')}: {e}")
 
-    print(f"[Evaluator] {len(approved_pins)}/{len(products)} products approved with content ready")
+    print(f"[Evaluator] {len(approved_pins)}/{min(len(products), MAX_PRODUCTS_TO_TRY)} products approved with content ready")
     return approved_pins
