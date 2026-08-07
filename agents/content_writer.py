@@ -1,17 +1,26 @@
 """
 AGENT 5 - Image Designer
 Content (title/description/tags) Product Evaluator se aata hai (Groq).
-Ye agent portrait-shape image design karta hai, phir use Google Drive pe
-upload karke ek public link deta hai - taaki Sheet mein asli designed
-(portrait) image dikhe, na ki Etsy ki original image.
+Ye agent portrait-shape image design karta hai. Image ko GitHub repo mein hi
+commit kiya jata hai (workflow ka agla step) aur uska raw.githubusercontent.com
+link Sheet mein daala jata hai - Drive use nahi karte kyunki service accounts
+ki apni storage quota nahi hoti (Google restriction).
 """
 
 import os
 from utils.image_designer import design_portrait_pin
 from utils.etsy_client import build_affiliate_link
-from utils.drive_upload import upload_image_and_get_link
 
 OUTPUT_DIR = "output_images"
+
+
+def _build_github_raw_url(filename):
+    """GitHub Actions automatically GITHUB_REPOSITORY env deta hai (owner/repo)."""
+    repo = os.environ.get("GITHUB_REPOSITORY", "")
+    branch = os.environ.get("GITHUB_REF_NAME", "main")
+    if not repo:
+        return ""  # local testing ke liye, workflow ke bahar
+    return f"https://raw.githubusercontent.com/{repo}/{branch}/{OUTPUT_DIR}/{filename}"
 
 
 def run(approved_products):
@@ -20,15 +29,15 @@ def run(approved_products):
 
     for i, product in enumerate(approved_products):
         try:
-            image_path = os.path.join(OUTPUT_DIR, f"pin_{i}.png")
+            filename = f"pin_{product.get('listing_id', i)}.png"
+            image_path = os.path.join(OUTPUT_DIR, filename)
             design_portrait_pin(product["image_url"], output_path=image_path)
 
-            # Designed portrait image ko Drive pe upload karo, public link lo
-            drive_link = upload_image_and_get_link(image_path, f"pin_{i}.png")
+            github_image_url = _build_github_raw_url(filename)
 
             final_pins.append({
                 "product_title": product.get("title"),
-                "image_url": drive_link,  # ab designed portrait image ka link hai
+                "image_url": github_image_url,
                 "local_image_path": image_path,
                 "affiliate_link": build_affiliate_link(product.get("url", "")),
                 "seo_title": product.get("seo_title", ""),
@@ -39,7 +48,7 @@ def run(approved_products):
                 "cross_check_approved": product.get("cross_check_approved", ""),
             })
         except Exception as e:
-            print(f"[Agent 5] Failed designing/uploading image for {product.get('title')}: {e}")
+            print(f"[Agent 5] Failed designing image for {product.get('title')}: {e}")
 
-    print(f"[Agent 5] {len(final_pins)} pins fully designed, uploaded, and ready")
+    print(f"[Agent 5] {len(final_pins)} pins fully designed and ready")
     return final_pins
