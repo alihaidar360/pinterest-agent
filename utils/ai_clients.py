@@ -20,7 +20,7 @@ gemini_model = genai.GenerativeModel("gemini-flash-latest")
 groq_client = Groq(api_key=GROQ_API_KEY)
 
 GROQ_TEXT_MODEL = "openai/gpt-oss-120b"
-GROQ_VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
+GROQ_VISION_MODEL = "qwen/qwen3.6-27b"
 
 
 def _extract_json(text):
