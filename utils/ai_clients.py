@@ -76,12 +76,13 @@ def gemini_text_json(prompt):
 
 # ---------------- GROQ (Agent 3+4+5 evaluator, Agent 6 optimizer) ----------------
 
-def groq_text(prompt, max_tokens=2500):
+def groq_text(prompt, max_tokens=2000):
     completion = groq_client.chat.completions.create(
         model=GROQ_TEXT_MODEL,
         messages=[{"role": "user", "content": prompt}],
         max_tokens=max_tokens,
         response_format={"type": "json_object"},
+        reasoning_effort="low",
     )
     return completion.choices[0].message.content
 
@@ -92,8 +93,9 @@ def groq_text_json(prompt, max_tokens=2500):
 
 def groq_vision_json(prompt, image_bytes, mime_type="image/jpeg", max_tokens=1200):
     """Groq ko ek image + prompt bhejna, JSON response lena.
-    NOTE: response_format json_object images ke saath reliably kaam nahi karta,
-    isliye sirf prompt-instruction + robust parsing pe depend karte hain."""
+    NOTE: reasoning_effort="none" se Qwen ka "thinking mode" band ho jata hai -
+    warna model pehle lambi <think> reasoning likhta hai jo token limit khatam
+    kar deti hai asli JSON answer se pehle hi."""
     b64_image = base64.b64encode(image_bytes).decode("utf-8")
     data_url = f"data:{mime_type};base64,{b64_image}"
 
@@ -109,6 +111,7 @@ def groq_vision_json(prompt, image_bytes, mime_type="image/jpeg", max_tokens=120
             }
         ],
         max_tokens=max_tokens,
+        reasoning_effort="none",
     )
     result = _extract_json(completion.choices[0].message.content)
     # Kabhi model JSON ko ek list ke andar wrap kar deta hai - unwrap kar lo
