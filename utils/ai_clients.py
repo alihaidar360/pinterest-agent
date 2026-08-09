@@ -82,7 +82,7 @@ def groq_text(prompt, max_tokens=2000):
         messages=[{"role": "user", "content": prompt}],
         max_tokens=max_tokens,
         response_format={"type": "json_object"},
-        reasoning_effort="low",
+        extra_body={"reasoning_effort": "low"},
     )
     return completion.choices[0].message.content
 
@@ -111,7 +111,7 @@ def groq_vision_json(prompt, image_bytes, mime_type="image/jpeg", max_tokens=120
             }
         ],
         max_tokens=max_tokens,
-        reasoning_effort="none",
+        extra_body={"reasoning_effort": "none"},
     )
     result = _extract_json(completion.choices[0].message.content)
     # Kabhi model JSON ko ek list ke andar wrap kar deta hai - unwrap kar lo
