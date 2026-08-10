@@ -65,12 +65,14 @@ def get_listing_image(listing_id):
 
 def build_affiliate_link(etsy_url):
     """
-    NOTE: Asli affiliate link Etsy Affiliate Program (Awin ke through) se milta hai.
-    Awin dashboard se apna publisher ID lekar is function ko update karna hoga.
-    Filhaal ye plain Etsy URL return karta hai - AWIN_PUBLISHER_ID set karke
-    isko wrap kiya ja sakta hai.
+    NOTE: Etsy ab Awin ki jagah Rakuten Advertising use karta hai (Awin pe
+    Etsy program abhi inactive hai). Jab tak Rakuten approval na aaye aur
+    unka proper deep-link format add na ho, plain Etsy URL use karo -
+    wo hamesha kaam karta hai, sirf commission track nahi hota tab tak.
     """
-    awin_id = os.environ.get("AWIN_PUBLISHER_ID", "")
-    if awin_id:
-        return f"https://www.awin1.com/cread.php?awinmid=6220&awinaffid={awin_id}&clickref=&p={etsy_url}"
+    rakuten_sid = os.environ.get("RAKUTEN_SID", "")
+    if rakuten_sid:
+        # Rakuten approve hone ke baad yahan unka deep-link format add karenge
+        # Example format: https://click.linksynergy.com/deeplink?id=SID&mid=MID&murl=ENCODED_URL
+        pass
     return etsy_url
