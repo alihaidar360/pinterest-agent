@@ -1,18 +1,22 @@
 """
 Product image ko Pinterest ke ideal portrait shape (1000x1500) mein
-design karta hai - brand-consistent background aur subtle framing ke saath.
+design karta hai - CLEAN, BRIGHT boho aesthetic (Pinterest par best
+perform karne wala style: product sabse prominent, minimal distraction).
 """
 
 import io
 import requests
-from PIL import Image, ImageDraw, ImageFont, ImageOps
+from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageFilter
 
 PIN_WIDTH = 1000
 PIN_HEIGHT = 1500
 
-GOLD = (196, 164, 100)
-BG_TOP = (10, 10, 10)
-BG_BOTTOM = (12, 34, 28)
+# Soft, warm, boho-neutral palette - light background taaki product pop kare
+CREAM_TOP = (250, 245, 236)
+CREAM_BOTTOM = (238, 228, 210)
+GOLD = (176, 141, 87)
+TEXT_DARK = (54, 48, 40)
+TEXT_MUTED = (128, 116, 98)
 
 
 def _download_image(url):
@@ -21,56 +25,72 @@ def _download_image(url):
     return Image.open(io.BytesIO(resp.content)).convert("RGB")
 
 
-def _gradient_background(w, h):
-    bg = Image.new("RGB", (w, h), BG_TOP)
+def _soft_gradient_background(w, h):
+    bg = Image.new("RGB", (w, h), CREAM_TOP)
     draw = ImageDraw.Draw(bg)
     for y in range(h):
         t = y / h
-        r = int(BG_TOP[0] + (BG_BOTTOM[0] - BG_TOP[0]) * t)
-        g = int(BG_TOP[1] + (BG_BOTTOM[1] - BG_TOP[1]) * t)
-        b = int(BG_TOP[2] + (BG_BOTTOM[2] - BG_TOP[2]) * t)
+        r = int(CREAM_TOP[0] + (CREAM_BOTTOM[0] - CREAM_TOP[0]) * t)
+        g = int(CREAM_TOP[1] + (CREAM_BOTTOM[1] - CREAM_TOP[1]) * t)
+        b = int(CREAM_TOP[2] + (CREAM_BOTTOM[2] - CREAM_TOP[2]) * t)
         draw.line([(0, y), (w, y)], fill=(r, g, b))
     return bg
 
 
+def _add_soft_shadow(base_img, product_img, position):
+    """Product ke peeche ek subtle drop shadow daalta hai depth ke liye."""
+    shadow = Image.new("RGBA", base_img.size, (0, 0, 0, 0))
+    shadow_shape = Image.new("L", product_img.size, 60)
+    shadow.paste(shadow_shape, (position[0] + 10, position[1] + 14), shadow_shape)
+    shadow = shadow.filter(ImageFilter.GaussianBlur(20))
+    base_img.paste(shadow, (0, 0), shadow)
+
+
 def design_portrait_pin(product_image_url, brand_name="Lumière & Luxe", output_path="pin.png"):
     """
-    Product image ko brand-consistent portrait pin mein convert karta hai:
-    - Gradient background (brand colors)
-    - Product image center mein, thin gold border ke sath
-    - Brand name chhota sa bottom mein
+    Product image ko clean, bright, Pinterest-optimized portrait pin mein
+    convert karta hai:
+    - Soft cream/boho gradient background
+    - Product image bada aur center mein, subtle shadow ke sath (no heavy border)
+    - Chhota brand wordmark neeche, minimal aur non-distracting
     """
-    canvas = _gradient_background(PIN_WIDTH, PIN_HEIGHT)
+    canvas = _soft_gradient_background(PIN_WIDTH, PIN_HEIGHT).convert("RGBA")
     draw = ImageDraw.Draw(canvas)
 
     product_img = _download_image(product_image_url)
 
-    # Product image ko fit karo (max 85% width, center mein), aspect ratio maintain
-    max_w = int(PIN_WIDTH * 0.85)
-    max_h = int(PIN_HEIGHT * 0.72)
+    # Product ko bada rakho - 90% width tak, taaki wahi hero ho
+    max_w = int(PIN_WIDTH * 0.90)
+    max_h = int(PIN_HEIGHT * 0.78)
     product_img = ImageOps.contain(product_img, (max_w, max_h))
 
     px = (PIN_WIDTH - product_img.width) // 2
-    py = int(PIN_HEIGHT * 0.08)
+    py = int(PIN_HEIGHT * 0.06)
 
-    # Thin gold border around product image
-    border_pad = 8
-    draw.rectangle(
-        [px - border_pad, py - border_pad,
-         px + product_img.width + border_pad, py + product_img.height + border_pad],
-        outline=GOLD, width=2
-    )
+    _add_soft_shadow(canvas, product_img, (px, py))
     canvas.paste(product_img, (px, py))
 
-    # Brand name at bottom
+    # Fonts
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf", 42)
+        font_brand = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf", 34)
+        font_tagline = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif-Italic.ttf", 20)
     except Exception:
-        font = ImageFont.load_default()
+        font_brand = font_tagline = ImageFont.load_default()
 
-    bbox = draw.textbbox((0, 0), brand_name, font=font)
+    # Thin gold divider line above brand name
+    line_y = PIN_HEIGHT - 110
+    draw.line([(PIN_WIDTH // 2 - 40, line_y), (PIN_WIDTH // 2 + 40, line_y)], fill=GOLD, width=2)
+
+    # Brand name - small, elegant, not overpowering
+    bbox = draw.textbbox((0, 0), brand_name, font=font_brand)
     tw = bbox[2] - bbox[0]
-    draw.text(((PIN_WIDTH - tw) / 2, PIN_HEIGHT - 130), brand_name, font=font, fill=(224, 197, 140))
+    draw.text(((PIN_WIDTH - tw) / 2, PIN_HEIGHT - 95), brand_name, font=font_brand, fill=TEXT_DARK)
 
-    canvas.save(output_path, "PNG")
+    # Small tagline
+    tagline = "925 Sterling Silver"
+    bbox = draw.textbbox((0, 0), tagline, font=font_tagline)
+    tw = bbox[2] - bbox[0]
+    draw.text(((PIN_WIDTH - tw) / 2, PIN_HEIGHT - 50), tagline, font=font_tagline, fill=TEXT_MUTED)
+
+    canvas.convert("RGB").save(output_path, "PNG")
     return output_path
