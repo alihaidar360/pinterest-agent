@@ -1,6 +1,7 @@
 """
 Google Sheets se connect karne ke liye utility.
 Ek hi continuous sheet use hoti hai - roz naye rows add hote hain.
+Ab "Listing ID" column bhi hai taaki DUPLICATE products dobara na aayein.
 """
 
 import os
@@ -18,7 +19,7 @@ SHEET_ID = os.environ.get("GOOGLE_SHEET_ID")
 SERVICE_ACCOUNT_JSON = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
 
 HEADERS = [
-    "Date", "Status", "Product Title", "Image URL", "Etsy Affiliate Link",
+    "Date", "Status", "Listing ID", "Product Title", "Image URL", "Etsy Affiliate Link",
     "SEO Title", "Description", "Alt Text", "Hashtags",
     "Visual Judge Score", "Cross Check Approved",
 ]
@@ -36,9 +37,32 @@ def get_worksheet():
     try:
         worksheet = sheet.worksheet("Pins")
     except gspread.WorksheetNotFound:
-        worksheet = sheet.add_worksheet(title="Pins", rows=1000, cols=len(HEADERS))
+        worksheet = sheet.add_worksheet(title="Pins", rows=2000, cols=len(HEADERS))
         worksheet.append_row(HEADERS)
+        return worksheet
+
+    # Agar purani sheet mein "Listing ID" column nahi hai (purana format), add karo
+    existing_headers = worksheet.row_values(1)
+    if "Listing ID" not in existing_headers:
+        worksheet.update_cell(1, 3, "Listing ID")
+        # Purani rows ka listing ID khali rahega - koi masla nahi, naya data sahi trackega
+
     return worksheet
+
+
+def get_used_listing_ids():
+    """
+    Sheet mein pehle se maujood sab listing_ids nikalta hai - taaki wahi
+    product dobara na process ho, na dobara pin bane.
+    """
+    worksheet = get_worksheet()
+    all_rows = worksheet.get_all_records()
+    used_ids = set()
+    for row in all_rows:
+        lid = row.get("Listing ID", "")
+        if lid:
+            used_ids.add(str(lid))
+    return used_ids
 
 
 def append_pin_row(pin_data: dict):
@@ -47,6 +71,7 @@ def append_pin_row(pin_data: dict):
     row = [
         datetime.utcnow().strftime("%Y-%m-%d"),
         "Not Posted",
+        str(pin_data.get("listing_id", "")),
         pin_data.get("product_title", ""),
         pin_data.get("image_url", ""),
         pin_data.get("affiliate_link", ""),
