@@ -4,9 +4,8 @@ Groq vision model se ek hi call mein: product ko judge karta hai, approve/reject
 karta hai, aur agar approve ho to SEO title/description/alt-text/hashtags bhi
 usi call mein bana deta hai.
 
-NOTE: Groq free tier ka daily token budget (TPD) limited hai (images bohot tokens
-khaate hain), isliye products ki count control mein rakhi gayi hai taaki roz ka
-quota na phate.
+NOTE: Groq free tier ka daily token budget (TPD) aur per-minute output limit
+(OTPM) dono limited hain, isliye products ki count control mein rakhi gayi hai.
 """
 
 import json
@@ -14,7 +13,7 @@ import requests
 from utils.ai_clients import groq_vision_json
 
 MIN_SCORE = 7
-MAX_PRODUCTS_TO_TRY = 10  # roz sirf itne products try karo taaki TPD limit na phate
+MAX_PRODUCTS_TO_TRY = 10
 
 
 def load_prompt():
@@ -45,6 +44,8 @@ def run(products, target_count=8):
                 f"Product title: {product.get('title')}\n"
                 f"Source keyword: {product.get('source_keyword')}\n"
             )
+            # max_tokens explicitly NAHI pass kar rahe - ai_clients.py ka safe
+            # default (900, jo Groq ke 1000 OTPM limit se kam hai) use hoga
             result = groq_vision_json(full_prompt, image_bytes, mime_type="image/jpeg")
 
             if not isinstance(result, dict):
