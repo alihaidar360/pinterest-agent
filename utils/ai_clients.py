@@ -10,7 +10,6 @@ import base64
 import google.generativeai as genai
 from groq import Groq
 
-# --- Setup clients using environment variables (GitHub Secrets se aate hain) ---
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
@@ -29,7 +28,6 @@ def _extract_json(text):
     blocks, ya extra text ke sath aate hain - sab clean karta hai.
     """
     if not isinstance(text, str):
-        # Kabhi content list of blocks ke roop mein aata hai - text nikaal lo
         if isinstance(text, list):
             text = " ".join(
                 block.get("text", "") if isinstance(block, dict) else str(block)
@@ -38,7 +36,6 @@ def _extract_json(text):
         else:
             text = str(text)
 
-    # <think>...</think> ya similar reasoning tags hata do
     text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
     text = re.sub(r"^```json\s*|\s*```$", "", text.strip(), flags=re.MULTILINE)
     text = text.strip()
@@ -48,7 +45,6 @@ def _extract_json(text):
     except json.JSONDecodeError:
         pass
 
-    # Fallback: sabse bada { } ya [ ] block dhoondo text mein
     obj_match = re.search(r"\{.*\}", text, re.DOTALL)
     if obj_match:
         try:
@@ -76,7 +72,7 @@ def gemini_text_json(prompt):
 
 # ---------------- GROQ (Agent 3+4+5 evaluator, Agent 6 optimizer) ----------------
 
-def groq_text(prompt, max_tokens=2000):
+def groq_text(prompt, max_tokens=1800):
     completion = groq_client.chat.completions.create(
         model=GROQ_TEXT_MODEL,
         messages=[{"role": "user", "content": prompt}],
@@ -87,15 +83,15 @@ def groq_text(prompt, max_tokens=2000):
     return completion.choices[0].message.content
 
 
-def groq_text_json(prompt, max_tokens=2500):
+def groq_text_json(prompt, max_tokens=1800):
     return _extract_json(groq_text(prompt, max_tokens=max_tokens))
 
 
-def groq_vision_json(prompt, image_bytes, mime_type="image/jpeg", max_tokens=1200):
+def groq_vision_json(prompt, image_bytes, mime_type="image/jpeg", max_tokens=900):
     """Groq ko ek image + prompt bhejna, JSON response lena.
-    NOTE: reasoning_effort="none" se Qwen ka "thinking mode" band ho jata hai -
-    warna model pehle lambi <think> reasoning likhta hai jo token limit khatam
-    kar deti hai asli JSON answer se pehle hi."""
+    NOTE: max_tokens 1000 se KAM rakhna zaroori hai - Groq ka is model ke
+    free tier pe output-tokens-per-minute (OTPM) hard limit hi 1000 hai,
+    isliye ek single request bhi 1000 se zyada maang nahi sakti."""
     b64_image = base64.b64encode(image_bytes).decode("utf-8")
     data_url = f"data:{mime_type};base64,{b64_image}"
 
@@ -105,7 +101,7 @@ def groq_vision_json(prompt, image_bytes, mime_type="image/jpeg", max_tokens=120
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": prompt + "\n\nRespond with ONLY valid JSON, no other text, no markdown, no explanation."},
+                    {"type": "text", "text": prompt + "\n\nRespond with ONLY valid JSON, no other text, no markdown, no explanation. Keep the description concise."},
                     {"type": "image_url", "image_url": {"url": data_url}},
                 ],
             }
@@ -114,7 +110,6 @@ def groq_vision_json(prompt, image_bytes, mime_type="image/jpeg", max_tokens=120
         extra_body={"reasoning_effort": "none"},
     )
     result = _extract_json(completion.choices[0].message.content)
-    # Kabhi model JSON ko ek list ke andar wrap kar deta hai - unwrap kar lo
     if isinstance(result, list) and len(result) > 0:
         result = result[0]
     return result
